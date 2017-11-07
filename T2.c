@@ -62,6 +62,7 @@ typedef struct process_control_block // estrutura PCB, uma para cada thread
 
 int EscrevePagina(process_control_block * pcb, int num_pagina) // retorna em qual frame a pagina foi escrita
 {
+  sem_wait(&mutex);
   // como é lista encadeada, deve ser percorrida do inicio, primeiro frame vago é preenchido
   node_mem * iterador = head_mem;
   while((iterador->frame.used == 1)  && (iterador->frame.index <= 99)) // percorre toda lista, vai parar no primeiro com used = 0
@@ -81,6 +82,7 @@ int EscrevePagina(process_control_block * pcb, int num_pagina) // retorna em qua
       pcb->page_table[num_pagina].frame_index = iterador->frame.index;  // tabela recebe indice de qual frame a pagina esta ocupando
       pcb->page_table[num_pagina].valid_bit = 1;  // indica que pagina esta carregada em um frame
   }
+  sem_post(&mutex);
 }
 
 
