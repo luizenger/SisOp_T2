@@ -121,6 +121,7 @@ void Vitimar(int pid, int page)
     else
     {
         //Second chance
+        // variavel index_second_chance é global e inicializada em 0
         while(memory[index_second_chance].second_chance == 1) // vai parar no primeiro com second_chance == 0
         {
           memory[index_second_chance].second_chance = 0;
@@ -170,6 +171,11 @@ int LerPagina(int process_id, int page) // retorna index do frame no qual pagina
       memory[PCBs[process_id].page_table[page].frame_index].second_chance = 1; // dá nova chance ao frame
       printf("Page %d from process %d found!\n", page, process_id);
 
+      if(algoritmo == 2) // LRU -> "shiftar" array de frame
+      {
+
+      }
+
     } // "ler" a pagina == do nothing
     else
     {
@@ -215,4 +221,10 @@ int main()
 
     for(int i=0;i<N_process;i++)
         {pthread_create(&(tid[cont]), &attr, rodaProcesso, NULL);}
+
+        for(long cont=0;cont<1000000000;cont++) {} // busy wait
+      	for(int i=0;i<N_process;i++)
+      		{
+      			pthread_cancel(tid[i]);
+      		}
 }
