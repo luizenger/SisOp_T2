@@ -184,6 +184,11 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
       if(algoritmo == 2) // LRU -> "shiftar" array de frame
       {
           frameaux = memory[PCBs[process_id].page_table[page].frame_index]; //frame auxiliar salva as info do ultimo frame lido
+          // se da forma acima nao funcionar, descomentar abaixo
+          // frameaux.page = memory[PCBs[process_id].page_table[page].frame_index].page;
+          // frameaux.process_id = memory[PCBs[process_id].page_table[page].frame_index].process_id;
+          // frameaux.used = memory[PCBs[process_id].page_table[page].frame_index].used;
+          // frameaux.second_chance = memory[PCBs[process_id].page_table[page].frame_index].second_chance;
 
         for(i=PCBs[process_id].page_table[page].frame_index;i>0;i--)
           {
@@ -193,6 +198,15 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
           memory[i].second_chance = memory[i-1].second_chance;
           PCBs[memory[i].process_id].page_table[memory[i].page].frame_index = i; //atualiza o frame_index de cada pagina ja que estao sendo deslocadas
           }
+
+          memory[0] = frameaux //carrega a pagina do frameaux no primeiro frame
+          // se acima nao funcionar, descomentar abaixo
+          // memory[0].page = frameaux.page;
+          // memory[0].process_id = frameaux.process_id;
+          // memory[0].used = frameaux.used;
+          // memory[0].second_chance = frameaux.second_chance;
+
+          PCBs[process_id].page_table[page].frame_index = 0;
       } 
     } // "ler" a pagina == do nothing
     else
