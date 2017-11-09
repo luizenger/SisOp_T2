@@ -54,6 +54,7 @@ typedef struct frame // frame sabe qual pagina esta contida, de qual processo é
 
 
 struct frame memory[N_frames]; // array de frames
+struct frame frameaux;
 
 
 sem_t mutex;  // mutex para gerenciar acesso à lista de frames
@@ -110,11 +111,20 @@ void Vitimar(int pid, int page)
         PCBs[memory[99].process_id].page_table[memory[99].page].valid_bit = 0;
 
         // deslocar to
-        memory[99].process_id = pid;
-        memory[99].page = page;
+        for(int i=N_frames;i>0;i--)
+        {
+          memory[i].page = memory[i-1].page;                     //desloca array de frames
+          memory[i].process_id = memory[i-1].process_id;
+          memory[i].used = memory[i-1].used;
+          memory[i].second_chance = memory[i-1].second_chance;
+          PCBs[memory[i].process_id].page_table[memory[i].page].frame_index = i; //atualiza o frame_index de cada pagina ja que estao sendo deslocadas
+        }
+
+        memory[0].process_id = pid; //carrega a pagina no primeiro frame
+        memory[0].page = page;
 
         PCBs[pid].page_table[page].valid_bit = 1;
-        PCBs[pid].page_table[page].frame_index = index_FIFO;
+        PCBs[pid].page_table[page].frame_index = 0;
 
     }
 
@@ -142,7 +152,7 @@ void Vitimar(int pid, int page)
 
 }
 
-int CarregaPagina(int pid, int page) // retorna em qual frame a pagina foi escrita
+int CarregaPagina(int pid, int page) // carrega pagina no array de frames
 {
   int i = 0;
 
@@ -163,7 +173,7 @@ int CarregaPagina(int pid, int page) // retorna em qual frame a pagina foi escri
 
 
 
-int LerPagina(int process_id, int page) // retorna index do frame no qual pagina se encontra
+int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
 {
   if(PCBs[process_id].page_table[page].valid_bit == 1)  // significa que a pagina esta "carregada" em algum frame
     {
@@ -173,9 +183,17 @@ int LerPagina(int process_id, int page) // retorna index do frame no qual pagina
 
       if(algoritmo == 2) // LRU -> "shiftar" array de frame
       {
+          frameaux = memory[PCBs[process_id].page_table[page].frame_index]; //frame auxiliar salva as info do ultimo frame lido
 
-      }
-
+        for(i=PCBs[process_id].page_table[page].frame_index;i>0;i--)
+          {
+          memory[i].page = memory[i-1].page;                     //desloca array de frames
+          memory[i].process_id = memory[i-1].process_id;
+          memory[i].used = memory[i-1].used;
+          memory[i].second_chance = memory[i-1].second_chance;
+          PCBs[memory[i].process_id].page_table[memory[i].page].frame_index = i; //atualiza o frame_index de cada pagina ja que estao sendo deslocadas
+          }
+      } 
     } // "ler" a pagina == do nothing
     else
     {
