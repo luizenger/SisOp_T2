@@ -123,6 +123,7 @@ void Vitimar(int pid, int page)
         //Second chance
         while(memory[index_second_chance].second_chance == 1) // vai parar no primeiro com second_chance == 0
         {
+          memory[index_second_chance].second_chance = 0;
           if(index_second_chance == 99)
           {index_second_chance = 0;}
           else
