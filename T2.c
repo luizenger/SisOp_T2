@@ -30,38 +30,32 @@ Engenharia da Computação - PUCRS -
 #define N_process 10
 #define N_pages 10
 
+// escolha do algoritmo de vitimacao:
+// 1 para FIFO
+// 2 para LRU
+// outro valor inteiro para Second chance
+#define algoritmo 1
+
 int total_page_fault = 0;
 int total_hit = 0;
 
-int index_ultimo_frame_escrito = 0; // variavel global para utilizar algoritmo de vitimacao FIFO
+int index_FIFO = 0; // variavel global para utilizar algoritmo de vitimacao FIFO
+// vai começar em 0, ir a 99 e voltar a zero, pois a memoria vai funcionar como uma lista mesmo
 
-typedef struct frame
-{
-    int index;
+typedef struct frame // frame sabe qual pagina esta contida, de qual processo é a página
+{                    // se esta sendo utilizado e controle para algoritmo second chance
+    int page;
     int process_id;
     int used = 0;
-    int second_chance = 0; // uso apenas para algoritmo de vitimação second-chance
+    int second_chance = 1; // uso apenas para algoritmo de vitimação second-chance
 }frame;
 
 
 struct frame memory[N_frames]; // array de frames
 
 
-//int iterador = 0;  // para percorrer a lista de frames
-
 sem_t mutex;  // mutex para gerenciar acesso à lista de frames
 
-
-/*typedef struct node_mem
-{
-	struct node_mem * previous;
-	struct node_mem * next;
-    struct frame      frame;
-}node_mem;
-
-node_mem * head_mem; // sempre vai apontar pro primeiro frame da lista
-node_mem * tail_mem; // sempre vai apontar pro ultimo frame da lista
-*/
 typedef struct page
 {
     int frame_index; // em qual frame a pagina esta localizada, vai de 0 a 99
@@ -81,12 +75,40 @@ void Vitimar(int pid, int page)
 {
     if (algoritmo == 1)
     {
-        //FIFO
+        // frame apontado pela variavel index_FIFO tera sua página substituída pelo nova
+        // como a memória é um array, e a escrita começa do índice 0 ao 99, a variável que indica frame
+        // a ser substituído vai ser incrementada a cada vitimação, voltando a 0 depois de 99
+        // pois a própria escrita da memória vai ocorrer de maneira sequencial
+
+        // primeiro deve-se alterar a page table do processo que vai "perder o frame"
+        // trocando o bit de validade para 0, indicando que a pagina n esta mais na memoria
+        PCBs[memory[index_FIFO].process_id].page_table[memory[index_FIFO].page].valid_bit = 0;
+
+        // atualiza frame com id no processo que esta carregando pagina pra memoria e com a pagina
+        memory[index_FIFO].process_id = pid;
+        memory[index_FIFO].page = page;
+
+        // atualiza page table do processo que esta carregando a pagina pra memoria
+        PCBs[pid].page_table[page].valid_bit = 1;
+        PCBs[pid].page_table[page].frame_index = index_FIFO;
+
+        // avança valor do index_FIFO -> frame recem escrito será o "último" a ser substituído
+        if(frame_index == 99) {frame_index = 0;}
+          else frame_index++;
+
     }
 
     else if (algoritmo == 2)
     {
-        //LRU
+        //LRU --> deixar fixo o indice que vai ser vitimado
+        // por exemplo, vitima sempre o indice 99
+        // mas quando ocorrer alguma leitura de frame, o frame lido deve ser jogado pro indice 0 -> shiftar todo array?
+        memory[99].process_id = pid;
+        memory[99].page = page;
+
+        PCBs[pid].page_table[page].valid_bit = 1;
+        PCBs[pid].page_table[page].frame_index = index_FIFO;
+
     }
 
     else
@@ -114,21 +136,7 @@ int CarregaPagina(int pid, int page) // retorna em qual frame a pagina foi escri
     if(i == N_frames) // testou todos frames, todo array memory
     {Vitimar(pid, page);}
 }
-    /*while(memory[i].used == 1 && i<=99)
-    {
-        // frame ja ocupado, avança pro próximo
-        i++;
-    }
 
-    if(i > 99)
-    {
-        //vitimacao
-    }
-
-    else*/
-
-}
-   
 
 
 int LerPagina(int process_id, int page) // retorna index do frame no qual pagina se encontra
@@ -153,14 +161,14 @@ int criaProcesso()
 
 }
 
-void * rodaProcesso(void* cont)
+void * rodaProcesso()
 {
     int pid = criaProcesso(); // para acessar o PCB especifico, basta usar PCBs[id]
     int num_pagina;
     while(1)
     {
       num_pagina = rand()%N_pages;  // pagina a ser lida eh aleatoria
-     
+
       sem_wait(&mutex);
       LerPagina(pid, num_pagina);
       sem_post(&mutex);
@@ -171,6 +179,7 @@ void * rodaProcesso(void* cont)
 int main()
 {
     srand( (unsigned)time(NULL) );
+
     sem_init(&mutex,0,1); // inicializa semaforo com um "credito"
     for(int i=0;i<N_frames;i++)   // inicializa a "memoria", carregando os indices de cada frame
     {
@@ -180,9 +189,6 @@ int main()
     pthread_t tid[N_process];
     pthread_attr_init(&attr);
 
-    while(cont < N_process) // loop para criar todas as threads
-    {
-        pthread_create(&(tid[cont]), &attr, rodaProcesso, cont);
-        cont++;
-    }
+    for(int i=0;i<N_process;i++)
+        {pthread_create(&(tid[cont]), &attr, rodaProcesso, NULL);}
 }
