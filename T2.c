@@ -199,7 +199,7 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
           PCBs[memory[i].process_id].page_table[memory[i].page].frame_index = i; //atualiza o frame_index de cada pagina ja que estao sendo deslocadas
           }
 
-          memory[0] = frameaux //carrega a pagina do frameaux no primeiro frame
+          memory[0] = frameaux; //carrega a pagina do frameaux no primeiro frame
           // se acima nao funcionar, descomentar abaixo
           // memory[0].page = frameaux.page;
           // memory[0].process_id = frameaux.process_id;
