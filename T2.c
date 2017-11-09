@@ -42,6 +42,8 @@ int total_hit = 0;
 int index_FIFO = 0; // variavel global para utilizar algoritmo de vitimacao FIFO
 // vai começar em 0, ir a 99 e voltar a zero, pois a memoria vai funcionar como uma lista mesmo
 
+int index_second_chance = 0; // vai guardar o indice de qual frame vai verificar primeiro
+
 typedef struct frame // frame sabe qual pagina esta contida, de qual processo é a página
 {                    // se esta sendo utilizado e controle para algoritmo second chance
     int page;
@@ -103,6 +105,11 @@ void Vitimar(int pid, int page)
         //LRU --> deixar fixo o indice que vai ser vitimado
         // por exemplo, vitima sempre o indice 99
         // mas quando ocorrer alguma leitura de frame, o frame lido deve ser jogado pro indice 0 -> shiftar todo array?
+
+        // primeiro invalidar na page table a pagina q vai ser vitimada
+        PCBs[memory[99].process_id].page_table[memory[99].page].valid_bit = 0;
+
+        // deslocar to
         memory[99].process_id = pid;
         memory[99].page = page;
 
@@ -114,7 +121,22 @@ void Vitimar(int pid, int page)
     else
     {
         //Second chance
-    }
+        while(memory[index_second_chance].second_chance == 1) // vai parar no primeiro com second_chance == 0
+        {
+          if(index_second_chance == 99)
+          {index_second_chance = 0;}
+          else
+          index_second_chance++;
+        }
+
+        memory[index_second_chance].process_id = pid;
+        memory[index_second_chance].page = page;
+
+        PCBs[pid].page_table[page].valid_bit = 1;
+        PCBs[pid].page_table[page].frame_index = index_second_chance;
+
+        index_second_chance++; // incrementa para começar a verificar no próximo frame,
+    }                          // e não no frame que acabou de escrever
 
 }
 
@@ -144,6 +166,7 @@ int LerPagina(int process_id, int page) // retorna index do frame no qual pagina
   if(PCBs[process_id].page_table[page].valid_bit == 1)  // significa que a pagina esta "carregada" em algum frame
     {
       total_hit++;
+      memory[PCBs[process_id].page_table[page].frame_index].second_chance = 1; // dá nova chance ao frame
       printf("Page %d from process %d found!\n", page, process_id);
 
     } // "ler" a pagina == do nothing
