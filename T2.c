@@ -13,8 +13,6 @@ Engenharia da Computação - PUCRS -
 // 08/11: criar uma lista encadeada ou array global que lista os 10 PCBs
 // quando thread começar, pedir pro SO algum dos PCBs dessa lista
 
-
-// implementação da memoria em lista duplamente encadeada, mas n circular!
 // sem_wait(&mutex) e sem_post(&mutex) entre o processo de escrita
 
 #include <unistd.h>
@@ -27,14 +25,14 @@ Engenharia da Computação - PUCRS -
 #include <stdlib.h>
 
 #define N_frames 100
-#define N_process 10
+#define N_process 20
 #define N_pages 10
 
 // escolha do algoritmo de vitimacao:
 // 1 para FIFO
 // 2 para LRU
-// outro valor inteiro para Second chance
-#define algoritmo 1
+// 3 para Second chance
+#define algoritmo 2
 
 int total_page_fault = 0;
 int total_hit = 0;
@@ -48,13 +46,12 @@ typedef struct frame // frame sabe qual pagina esta contida, de qual processo é
 {                    // se esta sendo utilizado e controle para algoritmo second chance
     int page;
     int process_id;
-    int used = 0;
-    int second_chance = 1; // uso apenas para algoritmo de vitimação second-chance
+    int used;
+    int second_chance; // uso apenas para algoritmo de vitimação second-chance
 }frame;
 
-
-struct frame memory[N_frames]; // array de frames
-struct frame frameaux;
+frame memory[N_frames]; // array de frames
+frame frameaux;
 
 
 sem_t mutex;  // mutex para gerenciar acesso à lista de frames
@@ -62,21 +59,22 @@ sem_t mutex;  // mutex para gerenciar acesso à lista de frames
 typedef struct page
 {
     int frame_index; // em qual frame a pagina esta localizada, vai de 0 a 99
-    int valid_bit = 0; // valid_bit em '0', pagina n esta em nenhum frame; em '1' pagina esta no frame indicado por frame_index
+    int valid_bit; // valid_bit em '0', pagina n esta em nenhum frame; em '1' pagina esta no frame indicado por frame_index
 }page;
+
 
 typedef struct process_control_block // estrutura PCB, uma para cada thread
 {
-    struct page page_table[N_pages];     // o indice do page table é a página a ser lida; o conteúdo é o frame no qual a pagina se encontra
+    page page_table[N_pages];     // o indice do page table é a página a ser lida; o conteúdo é o frame no qual a pagina se encontra
 }process_control_block;
 
-struct process_control_block PCBs[N_process];
+process_control_block PCBs[N_process];
 
 int processos_criados = 0;
 
 void Vitimar(int pid, int page)
 {
-    if (algoritmo == 1)
+    if (algoritmo == 1) // FIFO
     {
         // frame apontado pela variavel index_FIFO tera sua página substituída pelo nova
         // como a memória é um array, e a escrita começa do índice 0 ao 99, a variável que indica frame
@@ -96,19 +94,21 @@ void Vitimar(int pid, int page)
         PCBs[pid].page_table[page].frame_index = index_FIFO;
 
         // avança valor do index_FIFO -> frame recem escrito será o "último" a ser substituído
-        if(frame_index == 99) {frame_index = 0;}
-          else frame_index++;
+        if(index_FIFO == N_frames-1) {index_FIFO = 0;}
+          else index_FIFO++;
+
+        printf("Frame %d foi vitimado, preenchido com page %d do processo %d!\n", index_FIFO, page, pid);
 
     }
 
-    else if (algoritmo == 2)
+    else if (algoritmo == 2) // LRU
     {
         //LRU --> deixar fixo o indice que vai ser vitimado
         // por exemplo, vitima sempre o indice 99
         // mas quando ocorrer alguma leitura de frame, o frame lido deve ser jogado pro indice 0 -> shiftar todo array?
 
         // primeiro invalidar na page table a pagina q vai ser vitimada
-        PCBs[memory[99].process_id].page_table[memory[99].page].valid_bit = 0;
+        PCBs[memory[N_frames-1].process_id].page_table[memory[N_frames-1].page].valid_bit = 0;
 
         // deslocar to
         for(int i=N_frames;i>0;i--)
@@ -128,18 +128,20 @@ void Vitimar(int pid, int page)
 
     }
 
-    else
+    else if(algoritmo == 3) // Second Chance
     {
         //Second chance
         // variavel index_second_chance é global e inicializada em 0
         while(memory[index_second_chance].second_chance == 1) // vai parar no primeiro com second_chance == 0
         {
           memory[index_second_chance].second_chance = 0;
-          if(index_second_chance == 99)
+          if(index_second_chance == N_frames-1)
           {index_second_chance = 0;}
           else
           index_second_chance++;
         }
+
+        PCBs[memory[index_second_chance].process_id].page_table[memory[index_second_chance].page].valid_bit = 0;
 
         memory[index_second_chance].process_id = pid;
         memory[index_second_chance].page = page;
@@ -147,6 +149,11 @@ void Vitimar(int pid, int page)
         PCBs[pid].page_table[page].valid_bit = 1;
         PCBs[pid].page_table[page].frame_index = index_second_chance;
 
+        printf("Vitimou frame %d carregou page %d do process %d!\n", index_second_chance, page, pid);
+
+        if(index_second_chance == N_frames-1)
+        {index_second_chance = 0;}
+        else
         index_second_chance++; // incrementa para começar a verificar no próximo frame,
     }                          // e não no frame que acabou de escrever
 
@@ -161,6 +168,9 @@ int CarregaPagina(int pid, int page) // carrega pagina no array de frames
         if(memory[i].used == 0)
         {
             memory[i].used = 1;
+            memory[i].page = page;
+            memory[i].process_id = pid;
+
             PCBs[pid].page_table[page].valid_bit = 1;
             PCBs[pid].page_table[page].frame_index = i;
             i = 200;
@@ -179,7 +189,7 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
     {
       total_hit++;
       memory[PCBs[process_id].page_table[page].frame_index].second_chance = 1; // dá nova chance ao frame
-      printf("Page %d from process %d found!\n", page, process_id);
+      printf("Page %d from process %d found at frame %d!\n", page, process_id, PCBs[process_id].page_table[page].frame_index);
 
       if(algoritmo == 2) // LRU -> "shiftar" array de frame
       {
@@ -190,7 +200,7 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
           // frameaux.used = memory[PCBs[process_id].page_table[page].frame_index].used;
           // frameaux.second_chance = memory[PCBs[process_id].page_table[page].frame_index].second_chance;
 
-        for(i=PCBs[process_id].page_table[page].frame_index;i>0;i--)
+        for(int i=PCBs[process_id].page_table[page].frame_index;i>0;i--)
           {
           memory[i].page = memory[i-1].page;                     //desloca array de frames
           memory[i].process_id = memory[i-1].process_id;
@@ -207,11 +217,12 @@ int LerPagina(int process_id, int page) // verifica se a pagina ja esta no array
           // memory[0].second_chance = frameaux.second_chance;
 
           PCBs[process_id].page_table[page].frame_index = 0;
-      } 
+      }
     } // "ler" a pagina == do nothing
     else
     {
       total_page_fault++;
+      printf("Process %d page %d page fault!\n", process_id, page);
       CarregaPagina(process_id, page);
     }
 }
@@ -237,26 +248,54 @@ void * rodaProcesso()
     }
 }
 
+void initMem_PCBs()
+{
+  for(int i=0;i<N_frames;i++)
+  {
+    memory[i].used = 0; // iniciliza memoria livre
+    memory[i].second_chance = 1;
+  }
+
+  for(int i=0;i<N_process;i++)
+  {
+    for(int j=0;j<N_pages;j++)
+    {
+      PCBs[i].page_table[j].valid_bit = 0;  // nenhuma pagina esta carregada na memoria
+    }
+  }
+}
 
 int main()
 {
     srand( (unsigned)time(NULL) );
 
+    initMem_PCBs();
+
     sem_init(&mutex,0,1); // inicializa semaforo com um "credito"
-    for(int i=0;i<N_frames;i++)   // inicializa a "memoria", carregando os indices de cada frame
-    {
-      memory[i].index = i;
-    }
+
     pthread_attr_t attr;
     pthread_t tid[N_process];
     pthread_attr_init(&attr);
 
     for(int i=0;i<N_process;i++)
-        {pthread_create(&(tid[cont]), &attr, rodaProcesso, NULL);}
+        {pthread_create(&(tid[i]), &attr, rodaProcesso, NULL);}
 
         for(long cont=0;cont<1000000000;cont++) {} // busy wait
       	for(int i=0;i<N_process;i++)
       		{
       			pthread_cancel(tid[i]);
       		}
+    switch (algoritmo) {
+      case 1: printf("\nAlgoritmo FIFO\n");
+              break;
+      case 2: printf("\nAlgoritmo LRU\n");
+              break;
+      case 3: printf("\nAlgoritmo Second Chance\n");
+              break;
+      default: printf("\nAlgoritmo invalido!\n");
+              break;
+
+    }
+    printf("Total hit: %d\n", total_hit);
+    printf("Total page fault: %d\n", total_page_fault);
 }
