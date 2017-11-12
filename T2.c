@@ -25,14 +25,19 @@ Engenharia da Computação - PUCRS -
 #include <stdlib.h>
 
 #define N_frames 100
-#define N_process 20
+#define N_process 200
 #define N_pages 10
 
 // escolha do algoritmo de vitimacao:
 // 1 para FIFO
 // 2 para LRU
 // 3 para Second chance
-#define algoritmo 2
+#define algoritmo 1
+
+// escolha da aleatorização das páginas
+// 1 para totalmente randomico
+// 2 para simular localidade
+#define randomico 1
 
 int total_page_fault = 0;
 int total_hit = 0;
@@ -238,10 +243,35 @@ void * rodaProcesso()
 {
     int pid = criaProcesso(); // para acessar o PCB especifico, basta usar PCBs[id]
     int num_pagina;
+    int aux;
     while(1)
     {
-      num_pagina = rand()%N_pages;  // pagina a ser lida eh aleatoria
-
+      if(randomico==1)
+        num_pagina = rand()%N_pages;  // pagina a ser lida eh aleatoria
+      else if(randomico==2)
+        {
+          aux = rand()%800;
+          if(aux < 300)
+            num_pagina = 0;
+            else if(aux < 500)
+              num_pagina = 1;
+              else if(aux < 550)
+                num_pagina = 2;
+                else if(aux < 600)
+                  num_pagina = 3;
+                  else if(aux < 650)
+                    num_pagina = 4;
+                    else if(aux < 700)
+                      num_pagina = 5;
+                      else if(aux < 730)
+                        num_pagina = 6;
+                        else if(aux < 760)
+                          num_pagina = 7;
+                          else if(aux < 780)
+                            num_pagina = 8;
+                            else if(aux < 800)
+                              num_pagina = 9;
+        }
       sem_wait(&mutex);
       LerPagina(pid, num_pagina);
       sem_post(&mutex);
